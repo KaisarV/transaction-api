@@ -16,6 +16,10 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	query := "SELECT * FROM transactions"
+	id := r.URL.Query()["id"]
+	if id != nil {
+		query += " WHERE id = " + id[0]
+	}
 
 	rows, err := db.Query(query)
 	var response TransactionsResponse
@@ -46,7 +50,7 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 		response.Data = transactions
 	} else {
 		response.Status = 400
-		response.Message = "Error Array Size Not Correct"
+		response.Message = "Error"
 		w.WriteHeader(400)
 	}
 

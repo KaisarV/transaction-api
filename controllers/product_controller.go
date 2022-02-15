@@ -16,6 +16,10 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	query := "SELECT * FROM products"
+	id := r.URL.Query()["id"]
+	if id != nil {
+		query += " WHERE id = " + id[0]
+	}
 
 	rows, err := db.Query(query)
 	var response ProductsResponse
@@ -47,7 +51,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 		log.Println(len(products))
 	} else {
 		response.Status = 400
-		response.Message = "Error Array Size Not Correct"
+		response.Message = "Error"
 		w.WriteHeader(400)
 	}
 

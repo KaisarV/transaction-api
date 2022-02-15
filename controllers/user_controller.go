@@ -14,10 +14,15 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 	defer db.Close()
 
+	var response UsersResponse
+
 	query := "SELECT * FROM users"
+	id := r.URL.Query()["id"]
+	if id != nil {
+		query += " WHERE id = " + id[0]
+	}
 
 	rows, err := db.Query(query)
-	var response UsersResponse
 
 	if err != nil {
 		response.Status = 400
@@ -58,13 +63,16 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	err := r.ParseForm()
+	var response ErrorResponse
 
 	if err != nil {
-		log.Println(err)
+		response.Status = 400
+		response.Message = "Error Parsing Data"
+		w.WriteHeader(400)
+		log.Println(err.Error())
 		return
 	}
 
-	var response ErrorResponse
 	vars := mux.Vars(r)
 	userId := vars["id"]
 	data, _ := db.Query(`SELECT * FROM users WHERE id = ?;`, userId)
