@@ -4,27 +4,28 @@ import (
 	"log"
 	"net/http"
 
-	controllers "PraktikumPBP/controllers"
+	controller "PraktikumPBP/controller"
 
 	"github.com/gorilla/mux"
 )
 
 func main() {
 	router := mux.NewRouter()
-	router.HandleFunc("/users", controllers.InsertUser).Methods("POST")
-	router.HandleFunc("/users", controllers.GetAllUsers).Methods("GET")
-	router.HandleFunc("/users/{id}", controllers.UpdateUser).Methods("PUT")
-	router.HandleFunc("/users/{id}", controllers.DeleteUser).Methods("DELETE")
+	router.HandleFunc("/users", controller.InsertUser).Methods("POST")
+	router.HandleFunc("/users", controller.GetAllUsers).Methods("GET")
+	router.HandleFunc("/users/{id}", controller.UpdateUser).Methods("PUT")
+	router.HandleFunc("/users/{id}", controller.DeleteUser).Methods("DELETE")
 
-	router.HandleFunc("/products", controllers.InsertProduct).Methods("POST")
-	router.HandleFunc("/products", controllers.GetAllProducts).Methods("GET")
-	router.HandleFunc("/products/{id}", controllers.UpdateProduct).Methods("PUT")
-	router.HandleFunc("/products/{id}", controllers.DeleteProduct).Methods("DELETE")
+	router.HandleFunc("/products", controller.InsertProduct).Methods("POST")
+	router.HandleFunc("/products", controller.GetAllProducts).Methods("GET")
+	router.HandleFunc("/products/{id}", controller.UpdateProduct).Methods("PUT")
+	router.HandleFunc("/products/{id}", controller.DeleteProduct).Methods("DELETE")
 
-	router.HandleFunc("/transactions", controllers.InsertTransaction).Methods("POST")
-	router.HandleFunc("/transactions", controllers.GetAllTransactions).Methods("GET")
-	router.HandleFunc("/transactions/{id}", controllers.UpdateTransaction).Methods("PUT")
-	router.HandleFunc("/transactions/{id}", controllers.DeleteTransaction).Methods("DELETE")
+	router.HandleFunc("/transactions", controller.InsertTransaction).Methods("POST")
+	router.HandleFunc("/transactions", controller.GetAllTransactions).Methods("GET")
+	router.HandleFunc("/user/transaction", controller.GetDetailUserTransaction).Methods("GET")
+	router.HandleFunc("/transactions/{id}", controller.UpdateTransaction).Methods("PUT")
+	router.HandleFunc("/transactions/{id}", controller.DeleteTransaction).Methods("DELETE")
 
 	log.Println("Starting on Port")
 

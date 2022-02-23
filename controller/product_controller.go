@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	model "PraktikumPBP/model"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,19 +11,19 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func GetAllUsers(w http.ResponseWriter, r *http.Request) {
+func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 	db := connect()
+
 	defer db.Close()
 
-	var response UsersResponse
-
-	query := "SELECT * FROM users"
+	query := "SELECT * FROM products"
 	id := r.URL.Query()["id"]
 	if id != nil {
 		query += " WHERE id = " + id[0]
 	}
 
 	rows, err := db.Query(query)
+	var response model.ProductsResponse
 
 	if err != nil {
 		response.Status = 400
@@ -33,37 +34,39 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
-	var users []User
+	var product model.Product
+	var products []model.Product
 
 	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address); err != nil {
+		if err := rows.Scan(&product.ID, &product.Name, &product.Price); err != nil {
 			log.Println(err.Error())
 		} else {
-			users = append(users, user)
+			products = append(products, product)
 		}
 	}
 
-	if len(users) != 0 {
+	if len(products) != 0 {
 		response.Status = 200
 		response.Message = "Success"
-		response.Data = users
+		response.Data = products
+		log.Println(len(products))
 	} else {
 		response.Status = 400
-		response.Message = "Error Array Size Not Correct"
+		response.Message = "Error"
 		w.WriteHeader(400)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+
 }
 
-func DeleteUser(w http.ResponseWriter, r *http.Request) {
+func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 	defer db.Close()
 
 	err := r.ParseForm()
-	var response ErrorResponse
+	var response model.ErrorResponse
 
 	if err != nil {
 		response.Status = 400
@@ -74,19 +77,19 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	userId := vars["id"]
-	data, _ := db.Query(`SELECT * FROM users WHERE id = ?;`, userId)
+	productId := vars["id"]
+	data, _ := db.Query(`SELECT * FROM products WHERE id = ?;`, productId)
 
 	if data == nil {
 		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", userId)
+		response.Message = fmt.Sprintf("Data using id %s not found", productId)
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	_, errQuery := db.Query(`DELETE FROM users WHERE id = ?;`, userId)
+	_, errQuery := db.Query(`DELETE FROM products WHERE id = ?;`, productId)
 
 	if errQuery == nil {
 		response.Status = 200
@@ -102,12 +105,11 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func InsertUser(w http.ResponseWriter, r *http.Request) {
+func InsertProduct(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 	defer db.Close()
-
+	var response model.ProductResponse
 	err := r.ParseForm()
-	var response UserResponse
 
 	if err != nil {
 		response.Status = 400
@@ -117,34 +119,36 @@ func InsertUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user User
+	var product model.Product
+	product.Name = r.Form.Get("name")
+	product.Price, _ = strconv.Atoi(r.Form.Get("price"))
 
-	user.Name = r.Form.Get("name")
-	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
-	user.Address = r.Form.Get("address")
+	log.Println(product.Name)
+	log.Println(product.Price)
 
-	_, errQuery := db.Exec("INSERT INTO users (name, age, address) VALUES (?,?,?)", user.Name, user.Age, user.Address)
+	_, errQuery := db.Exec("INSERT INTO products (name, price) VALUES (?,?)", product.Name, product.Price)
 
 	if errQuery == nil {
 		response.Status = 200
 		response.Message = "Success"
-		response.Data = user
+		response.Data = product
 	} else {
 		response.Status = 400
 		response.Message = "Error Insert Data"
 		w.WriteHeader(400)
+		log.Println(err.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
-func UpdateUser(w http.ResponseWriter, r *http.Request) {
+func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 	defer db.Close()
 
 	err := r.ParseForm()
-	var response ErrorResponse
+	var response model.ErrorResponse
 
 	if err != nil {
 		response.Status = 400
@@ -155,25 +159,24 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vars := mux.Vars(r)
-	userId := vars["id"]
+	productId := vars["id"]
 
-	data, _ := db.Query(`SELECT * FROM users WHERE id = ?;`, userId)
+	data, _ := db.Query(`SELECT * FROM products WHERE id = ?;`, productId)
 
 	if data == nil {
 		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", userId)
+		response.Message = fmt.Sprintf("Data using id %s not found", productId)
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	var user User
-	user.Name = r.Form.Get("name")
-	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
-	user.Address = r.Form.Get("address")
+	var product model.Product
+	product.Name = r.Form.Get("name")
+	product.Price, _ = strconv.Atoi(r.Form.Get("price"))
 
-	_, errQuery := db.Query(`UPDATE users SET name = ?, age = ?, address = ? WHERE id = ?;`, user.Name, user.Age, user.Address, userId)
+	_, errQuery := db.Query(`UPDATE products SET name = ?, price = ? WHERE id = ?;`, product.Name, product.Price, productId)
 
 	if errQuery == nil {
 		response.Status = 200
