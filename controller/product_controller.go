@@ -27,7 +27,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		response.Status = 400
-		response.Message = "Data Not Found"
+		response.Message = err.Error()
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
@@ -39,7 +39,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		if err := rows.Scan(&product.ID, &product.Name, &product.Price); err != nil {
-			log.Println(err.Error())
+			response.Message += err.Error() + "\n"
 		} else {
 			products = append(products, product)
 		}
@@ -49,16 +49,14 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 		response.Status = 200
 		response.Message = "Success"
 		response.Data = products
-		log.Println(len(products))
-	} else {
+	} else if response.Message == "" {
 		response.Status = 400
-		response.Message = "Error"
+		response.Message = "Data Not Found"
 		w.WriteHeader(400)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-
 }
 
 func DeleteProduct(w http.ResponseWriter, r *http.Request) {
@@ -78,18 +76,17 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	productId := vars["id"]
-	data, _ := db.Query(`SELECT * FROM products WHERE id = ?;`, productId)
+	query, errQuery := db.Exec(`DELETE FROM products WHERE id = ?;`, productId)
+	RowsAffected, err := query.RowsAffected()
 
-	if data == nil {
+	if RowsAffected == 0 {
 		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", productId)
+		response.Message = "Product not found"
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 		return
 	}
-
-	_, errQuery := db.Query(`DELETE FROM products WHERE id = ?;`, productId)
 
 	if errQuery == nil {
 		response.Status = 200

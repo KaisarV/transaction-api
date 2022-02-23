@@ -39,7 +39,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address); err != nil {
-			log.Println(err.Error())
+			response.Message += err.Error() + "\n"
 		} else {
 			users = append(users, user)
 		}
@@ -49,9 +49,9 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		response.Status = 200
 		response.Message = "Success"
 		response.Data = users
-	} else {
+	} else if response.Message == "" {
 		response.Status = 400
-		response.Message = "Error Array Size Not Correct"
+		response.Message = "Data Not Found"
 		w.WriteHeader(400)
 	}
 
@@ -76,18 +76,17 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	userId := vars["id"]
-	data, _ := db.Query(`SELECT * FROM users WHERE id = ?;`, userId)
+	query, errQuery := db.Exec(`DELETE FROM users WHERE id = ?;`, userId)
+	RowsAffected, err := query.RowsAffected()
 
-	if data == nil {
+	if RowsAffected == 0 {
 		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", userId)
+		response.Message = "User not found"
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 		return
 	}
-
-	_, errQuery := db.Query(`DELETE FROM users WHERE id = ?;`, userId)
 
 	if errQuery == nil {
 		response.Status = 200
@@ -95,7 +94,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	} else {
 		response.Status = 400
-		response.Message = "Error Delete Data"
+		response.Message = "Failed Delete Data"
 		w.WriteHeader(400)
 	}
 
@@ -158,23 +157,22 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userId := vars["id"]
 
-	data, _ := db.Query(`SELECT * FROM users WHERE id = ?;`, userId)
-
-	if data == nil {
-		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", userId)
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
 	var user model.User
 	user.Name = r.Form.Get("name")
 	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
 	user.Address = r.Form.Get("address")
 
-	_, errQuery := db.Query(`UPDATE users SET name = ?, age = ?, address = ? WHERE id = ?;`, user.Name, user.Age, user.Address, userId)
+	query, errQuery := db.Exec(`UPDATE users SET name = ?, age = ?, address = ? WHERE id = ?;`, user.Name, user.Age, user.Address, userId)
+	RowsAffected, err := query.RowsAffected()
+
+	if RowsAffected == 0 {
+		response.Status = 400
+		response.Message = fmt.Sprintf("Users using id %s not found", userId)
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
 
 	if errQuery == nil {
 		response.Status = 200
