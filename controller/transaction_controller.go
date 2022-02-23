@@ -3,7 +3,6 @@ package controllers
 import (
 	model "PraktikumPBP/model"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -39,7 +38,7 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		if err := rows.Scan(&transaction.ID, &transaction.UserID, &transaction.ProductId, &transaction.Quantity); err != nil {
-			response.Message += err.Error() + "\n"
+			log.Println(err.Error())
 		} else {
 			transactions = append(transactions, transaction)
 		}
@@ -96,6 +95,7 @@ func DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Failed Delete Data"
 		w.WriteHeader(400)
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -132,6 +132,7 @@ func InsertTransaction(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Error Insert Data"
 		w.WriteHeader(400)
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -143,7 +144,7 @@ func UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	err := r.ParseForm()
-	var response model.ErrorResponse
+	var response model.TransactionResponse
 
 	if err != nil {
 		response.Status = 400
@@ -156,52 +157,54 @@ func UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	transactionId := vars["id"]
 
-	data, err := db.Query(`SELECT * FROM transactions WHERE id = ?;`, transactionId)
-
-	if data == nil {
-		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", transactionId)
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
 	var transaction model.Transaction
 	transaction.UserID, _ = strconv.Atoi(r.Form.Get("userid"))
 	transaction.ProductId, _ = strconv.Atoi(r.Form.Get("productid"))
 	transaction.Quantity, _ = strconv.Atoi(r.Form.Get("qty"))
 
-	var transactionOld model.Transaction
+	rows, _ := db.Query("SELECT * FROM transactions WHERE id = ?", transactionId)
+	var prevDatas []model.Transaction
+	var prevData model.Transaction
 
-	if err := data.Scan(&transactionOld.ID, &transactionOld.UserID, &transactionOld.ProductId, &transactionOld.Quantity); err != nil {
-		log.Println(err.Error())
+	for rows.Next() {
+		if err := rows.Scan(&prevData.ID, &prevData.UserID, &prevData.ProductId, &prevData.Quantity); err != nil {
+			log.Println(err.Error())
+		} else {
+			prevDatas = append(prevDatas, prevData)
+		}
 	}
 
-	if transaction.UserID == 0 {
-		transaction.UserID = transactionOld.UserID
-	}
+	if len(prevDatas) > 0 {
+		if transaction.UserID == 0 {
+			transaction.UserID = prevDatas[0].UserID
+		}
+		if transaction.ProductId == 0 {
+			transaction.ProductId = prevDatas[0].ProductId
+		}
+		if transaction.Quantity == 0 {
+			transaction.Quantity = prevDatas[0].Quantity
+		}
 
-	if transaction.ProductId == 0 {
-		transaction.ProductId = transactionOld.ProductId
-	}
+		_, errQuery := db.Exec(`UPDATE transactions SET UserID = ?, ProductID = ?, Quantity = ? WHERE id = ?;`, transaction.UserID, transaction.ProductId, transaction.Quantity, transactionId)
 
-	if transaction.Quantity == 0 {
-		transaction.Quantity = transactionOld.Quantity
-	}
+		if errQuery == nil {
+			response.Status = 200
+			response.Message = "Success Update Data"
+			id, _ := strconv.Atoi(transactionId)
+			transaction.ID = id
+			response.Data = transaction
+			w.WriteHeader(200)
+		} else {
+			response.Status = 400
+			response.Message = "Error Update Data"
+			w.WriteHeader(400)
+			log.Println(errQuery)
 
-	_, errQuery := db.Query(`UPDATE transactions SET userid = ?, productid = ?, quantity = ? WHERE id = ?;`, transaction.UserID, transaction.ProductId, transaction.Quantity, transactionId)
-
-	if errQuery == nil {
-		response.Status = 200
-		response.Message = "Success Update Data"
-		w.WriteHeader(200)
+		}
 	} else {
 		response.Status = 400
-		response.Message = "Error Update Data"
+		response.Message = "Data Not Found"
 		w.WriteHeader(400)
-		log.Println(errQuery)
-
 	}
 
 	w.Header().Set("Content-Type", "application/json")

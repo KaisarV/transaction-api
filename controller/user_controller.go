@@ -3,7 +3,6 @@ package controllers
 import (
 	model "PraktikumPBP/model"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -39,7 +38,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address); err != nil {
-			response.Message += err.Error() + "\n"
+			log.Println(err.Error())
 		} else {
 			users = append(users, user)
 		}
@@ -96,6 +95,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Failed Delete Data"
 		w.WriteHeader(400)
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -133,6 +133,7 @@ func InsertUser(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Error Insert Data"
 		w.WriteHeader(400)
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -144,7 +145,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	err := r.ParseForm()
-	var response model.ErrorResponse
+	var response model.UserResponse
 
 	if err != nil {
 		response.Status = 400
@@ -161,29 +162,54 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	user.Name = r.Form.Get("name")
 	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
 	user.Address = r.Form.Get("address")
+	user.Password = r.Form.Get("password")
 
-	query, errQuery := db.Exec(`UPDATE users SET name = ?, age = ?, address = ? WHERE id = ?;`, user.Name, user.Age, user.Address, userId)
-	RowsAffected, err := query.RowsAffected()
+	rows, _ := db.Query("SELECT * FROM users WHERE id = ?", userId)
+	var prevDatas []model.User
+	var prevData model.User
 
-	if RowsAffected == 0 {
-		response.Status = 400
-		response.Message = fmt.Sprintf("Users using id %s not found", userId)
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
+	for rows.Next() {
+		if err := rows.Scan(&prevData.ID, &prevData.Name, &prevData.Age, &prevData.Address, &prevData.Password); err != nil {
+			log.Println(err.Error())
+		} else {
+			prevDatas = append(prevDatas, prevData)
+		}
 	}
 
-	if errQuery == nil {
-		response.Status = 200
-		response.Message = "Success Update Data"
-		w.WriteHeader(200)
+	if len(prevDatas) > 0 {
+		if user.Name == "" {
+			user.Name = prevDatas[0].Name
+		}
+		if user.Age == 0 {
+			user.Age = prevDatas[0].Age
+		}
+		if user.Address == "" {
+			user.Address = prevDatas[0].Address
+		}
+		if user.Password == "" {
+			user.Password = prevDatas[0].Password
+		}
+
+		_, errQuery := db.Exec(`UPDATE users SET name = ?, age = ?, address = ?, password = ? WHERE id = ?;`, user.Name, user.Age, user.Address, user.Password, userId)
+
+		if errQuery == nil {
+			response.Status = 200
+			response.Message = "Success Update Data"
+			id, _ := strconv.Atoi(userId)
+			user.ID = id
+			response.Data = user
+			w.WriteHeader(200)
+		} else {
+			response.Status = 400
+			response.Message = "Error Update Data"
+			w.WriteHeader(400)
+			log.Println(errQuery)
+		}
+
 	} else {
 		response.Status = 400
-		response.Message = "Error Update Data"
+		response.Message = "Data Not Found"
 		w.WriteHeader(400)
-		log.Println(errQuery)
-
 	}
 
 	w.Header().Set("Content-Type", "application/json")

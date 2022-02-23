@@ -3,7 +3,6 @@ package controllers
 import (
 	model "PraktikumPBP/model"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -39,7 +38,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		if err := rows.Scan(&product.ID, &product.Name, &product.Price); err != nil {
-			response.Message += err.Error() + "\n"
+			log.Println(err.Error())
 		} else {
 			products = append(products, product)
 		}
@@ -49,7 +48,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 		response.Status = 200
 		response.Message = "Success"
 		response.Data = products
-	} else if response.Message == "" {
+	} else {
 		response.Status = 400
 		response.Message = "Data Not Found"
 		w.WriteHeader(400)
@@ -96,6 +95,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Error Delete Data"
 		w.WriteHeader(400)
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -133,7 +133,7 @@ func InsertProduct(w http.ResponseWriter, r *http.Request) {
 		response.Status = 400
 		response.Message = "Error Insert Data"
 		w.WriteHeader(400)
-		log.Println(err.Error())
+		log.Println(errQuery.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -141,11 +141,12 @@ func InsertProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateProduct(w http.ResponseWriter, r *http.Request) {
+
 	db := connect()
 	defer db.Close()
 
 	err := r.ParseForm()
-	var response model.ErrorResponse
+	var response model.ProductResponse
 
 	if err != nil {
 		response.Status = 400
@@ -158,33 +159,49 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	productId := vars["id"]
 
-	data, _ := db.Query(`SELECT * FROM products WHERE id = ?;`, productId)
-
-	if data == nil {
-		response.Status = 400
-		response.Message = fmt.Sprintf("Data using id %s not found", productId)
-		w.WriteHeader(400)
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
 	var product model.Product
 	product.Name = r.Form.Get("name")
 	product.Price, _ = strconv.Atoi(r.Form.Get("price"))
 
-	_, errQuery := db.Query(`UPDATE products SET name = ?, price = ? WHERE id = ?;`, product.Name, product.Price, productId)
+	rows, _ := db.Query(`SELECT * FROM products WHERE ID = ?;`, productId)
+	var prevDatas []model.Product
+	var prevData model.Product
 
-	if errQuery == nil {
-		response.Status = 200
-		response.Message = "Success Update Data"
-		w.WriteHeader(200)
+	for rows.Next() {
+		if err := rows.Scan(&prevData.ID, &prevData.Name, &prevData.Price); err != nil {
+			log.Println(err.Error())
+		} else {
+			prevDatas = append(prevDatas, prevData)
+		}
+	}
+
+	if len(prevDatas) > 0 {
+		if product.Name == "" {
+			product.Name = prevDatas[0].Name
+		}
+		if product.Price == 0 {
+			product.Price = prevDatas[0].Price
+		}
+
+		_, errQuery := db.Exec(`UPDATE products SET name = ?, price = ? WHERE id = ?;`, product.Name, product.Price, productId)
+
+		if errQuery == nil {
+			response.Status = 200
+			response.Message = "Success Update Data"
+			id, _ := strconv.Atoi(productId)
+			product.ID = id
+			response.Data = product
+			w.WriteHeader(200)
+		} else {
+			response.Status = 400
+			response.Message = "Error Update Data"
+			w.WriteHeader(400)
+			log.Println(errQuery)
+		}
 	} else {
 		response.Status = 400
-		response.Message = "Error Update Data"
+		response.Message = "Data Not Found"
 		w.WriteHeader(400)
-		log.Println(errQuery)
-
 	}
 
 	w.Header().Set("Content-Type", "application/json")
