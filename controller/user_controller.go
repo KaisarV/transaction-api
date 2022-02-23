@@ -10,6 +10,17 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// func LoginUser(w http.ResponseWriter, r *http.Request) {
+// 	db := connect()
+
+// 	defer db.Close()
+
+// 	var response model.ErrorResponse
+
+// 	rows, err := "SELECT email"
+
+// }
+
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 	defer db.Close()
@@ -26,7 +37,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		response.Status = 400
-		response.Message = "Data Not Found"
+		response.Message = err.Error()
 		w.WriteHeader(400)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
@@ -37,7 +48,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	var users []model.User
 
 	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address, &user.Password); err != nil {
 			log.Println(err.Error())
 		} else {
 			users = append(users, user)
@@ -46,7 +57,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 
 	if len(users) != 0 {
 		response.Status = 200
-		response.Message = "Success"
+		response.Message = "Success Get Data"
 		response.Data = users
 	} else if response.Message == "" {
 		response.Status = 400
@@ -122,12 +133,15 @@ func InsertUser(w http.ResponseWriter, r *http.Request) {
 	user.Name = r.Form.Get("name")
 	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
 	user.Address = r.Form.Get("address")
+	user.Password = r.Form.Get("password")
 
-	_, errQuery := db.Exec("INSERT INTO users (name, age, address) VALUES (?,?,?)", user.Name, user.Age, user.Address)
+	res, errQuery := db.Exec("INSERT INTO users (name, age, address, password) VALUES (?,?,?,?)", user.Name, user.Age, user.Address)
+	id, err := res.LastInsertId()
 
 	if errQuery == nil {
 		response.Status = 200
 		response.Message = "Success"
+		user.ID = int(id)
 		response.Data = user
 	} else {
 		response.Status = 400

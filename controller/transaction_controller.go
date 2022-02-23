@@ -14,6 +14,7 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 
 	defer db.Close()
+	var response model.TransactionsResponse
 
 	query := "SELECT * FROM transactions"
 	id := r.URL.Query()["id"]
@@ -22,7 +23,6 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := db.Query(query)
-	var response model.TransactionsResponse
 
 	if err != nil {
 		response.Status = 400
@@ -46,7 +46,7 @@ func GetAllTransactions(w http.ResponseWriter, r *http.Request) {
 
 	if len(transactions) != 0 {
 		response.Status = 200
-		response.Message = "Success"
+		response.Message = "Succes Get Data"
 		response.Data = transactions
 	} else if response.Message == "" {
 		response.Status = 400
@@ -122,11 +122,42 @@ func InsertTransaction(w http.ResponseWriter, r *http.Request) {
 	transaction.ProductId, _ = strconv.Atoi(r.Form.Get("productid"))
 	transaction.Quantity, _ = strconv.Atoi(r.Form.Get("qty"))
 
-	_, errQuery := db.Exec("INSERT INTO transactions (userid, productid, quantity) VALUES (?,?,?)", transaction.UserID, transaction.ProductId, transaction.Quantity)
+	rows, errQuery := db.Query("SELECT * FROM products WHERE id=?", transaction.ProductId)
+
+	if err != nil {
+		response.Status = 400
+		response.Message = err.Error()
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	i := 0
+	for rows.Next() {
+		i++
+	}
+
+	if i == 0 {
+		_, err = db.Exec("INSERT INTO products (id) VALUES (?)", transaction.ProductId)
+
+		if err != nil {
+			response.Status = 400
+			response.Message = err.Error()
+			w.WriteHeader(400)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+	}
+	res, errQuery := db.Exec("INSERT INTO transactions (userid, productid, quantity) VALUES (?,?,?)", transaction.UserID, transaction.ProductId, transaction.Quantity)
+
+	id, err := res.LastInsertId()
 
 	if errQuery == nil {
 		response.Status = 200
 		response.Message = "Success"
+		transaction.ID = int(id)
 		response.Data = transaction
 	} else {
 		response.Status = 400
@@ -255,11 +286,11 @@ func GetDetailUserTransaction(w http.ResponseWriter, r *http.Request) {
 
 	if len(transactionDetails) != 0 {
 		response.Status = 200
-		response.Message = "Success"
+		response.Message = "Success Get Data"
 		response.Data = transactionDetails
 	} else {
 		response.Status = 400
-		response.Message = "Error"
+		response.Message = "Error Get Data"
 		w.WriteHeader(400)
 	}
 

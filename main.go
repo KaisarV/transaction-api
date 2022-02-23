@@ -13,6 +13,7 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/users", controller.InsertUser).Methods("POST")
 	router.HandleFunc("/users", controller.GetAllUsers).Methods("GET")
+	// router.HandleFunc("/users/login", controller.GetAllUsers).Methods("GET")
 	router.HandleFunc("/users/{id}", controller.UpdateUser).Methods("PUT")
 	router.HandleFunc("/users/{id}", controller.DeleteUser).Methods("DELETE")
 
@@ -23,7 +24,7 @@ func main() {
 
 	router.HandleFunc("/transactions", controller.InsertTransaction).Methods("POST")
 	router.HandleFunc("/transactions", controller.GetAllTransactions).Methods("GET")
-	router.HandleFunc("/user/transaction", controller.GetDetailUserTransaction).Methods("GET")
+	router.HandleFunc("transactions/user", controller.GetDetailUserTransaction).Methods("GET")
 	router.HandleFunc("/transactions/{id}", controller.UpdateTransaction).Methods("PUT")
 	router.HandleFunc("/transactions/{id}", controller.DeleteTransaction).Methods("DELETE")
 

@@ -14,6 +14,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 	db := connect()
 
 	defer db.Close()
+	var response model.ProductsResponse
 
 	query := "SELECT * FROM products"
 	id := r.URL.Query()["id"]
@@ -22,7 +23,6 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := db.Query(query)
-	var response model.ProductsResponse
 
 	if err != nil {
 		response.Status = 400
@@ -46,7 +46,7 @@ func GetAllProducts(w http.ResponseWriter, r *http.Request) {
 
 	if len(products) != 0 {
 		response.Status = 200
-		response.Message = "Success"
+		response.Message = "Success Get Data"
 		response.Data = products
 	} else {
 		response.Status = 400
@@ -75,7 +75,8 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	productId := vars["id"]
-	query, errQuery := db.Exec(`DELETE FROM products WHERE id = ?;`, productId)
+	query, errQuery := db.Exec(`DELETE FROM transactions WHERE ProductId = ?;`, productId)
+	query, errQuery = db.Exec(`DELETE FROM products WHERE id = ?;`, productId)
 	RowsAffected, err := query.RowsAffected()
 
 	if RowsAffected == 0 {
@@ -123,11 +124,14 @@ func InsertProduct(w http.ResponseWriter, r *http.Request) {
 	log.Println(product.Name)
 	log.Println(product.Price)
 
-	_, errQuery := db.Exec("INSERT INTO products (name, price) VALUES (?,?)", product.Name, product.Price)
+	res, errQuery := db.Exec("INSERT INTO products (name, price) VALUES (?,?)", product.Name, product.Price)
+
+	id, err := res.LastInsertId()
 
 	if errQuery == nil {
 		response.Status = 200
 		response.Message = "Success"
+		product.ID = int(id)
 		response.Data = product
 	} else {
 		response.Status = 400
