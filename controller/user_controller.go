@@ -10,16 +10,77 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// func LoginUser(w http.ResponseWriter, r *http.Request) {
-// 	db := connect()
+func LoginUser(w http.ResponseWriter, r *http.Request) {
+	db := connect()
 
-// 	defer db.Close()
+	defer db.Close()
+	var response model.ErrorResponse
 
-// 	var response model.ErrorResponse
+	err := r.ParseForm()
+	if err != nil {
+		response.Status = 400
+		response.Message = "Error Parsing Data"
+		w.WriteHeader(400)
+		log.Println(err.Error())
+		return
+	}
 
-// 	rows, err := "SELECT email"
+	email := r.Form.Get("email")
+	password := r.Form.Get("password")
 
-// }
+	if email == "" {
+		response.Status = 400
+		response.Message = "Please Input Email"
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	if password == "" {
+		response.Status = 400
+		response.Message = "Please Input Password"
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	rows, err := db.Query("SELECT email, password FROM users WHERE email= ?", email)
+
+	if err != nil {
+		response.Status = 400
+		response.Message = err.Error()
+		w.WriteHeader(400)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+
+	var user model.User
+	var users []model.User
+
+	for rows.Next() {
+		if err := rows.Scan(&user.Email, &user.Password); err != nil {
+			log.Println(err.Error())
+		} else {
+			users = append(users, user)
+		}
+	}
+
+	if users[0].Password == password {
+		response.Status = 200
+		response.Message = "Login Success"
+		w.Header().Set("Content-Type", "application/json")
+	} else {
+		response.Status = 400
+		response.Message = "Login Failed"
+		w.WriteHeader(400)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+}
 
 func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	db := connect()
@@ -48,7 +109,7 @@ func GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	var users []model.User
 
 	for rows.Next() {
-		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address, &user.Password); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Age, &user.Address, &user.Email, &user.Password); err != nil {
 			log.Println(err.Error())
 		} else {
 			users = append(users, user)
@@ -133,9 +194,10 @@ func InsertUser(w http.ResponseWriter, r *http.Request) {
 	user.Name = r.Form.Get("name")
 	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
 	user.Address = r.Form.Get("address")
+	user.Email = r.Form.Get("email")
 	user.Password = r.Form.Get("password")
 
-	res, errQuery := db.Exec("INSERT INTO users (name, age, address, password) VALUES (?,?,?,?)", user.Name, user.Age, user.Address)
+	res, errQuery := db.Exec("INSERT INTO users (name, age, address, email, password) VALUES (?,?,?,?,?)", user.Name, user.Age, user.Address, user.Email, user.Password)
 	id, err := res.LastInsertId()
 
 	if errQuery == nil {
@@ -176,6 +238,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	user.Name = r.Form.Get("name")
 	user.Age, _ = strconv.Atoi(r.Form.Get("age"))
 	user.Address = r.Form.Get("address")
+	user.Email = r.Form.Get("email")
 	user.Password = r.Form.Get("password")
 
 	rows, _ := db.Query("SELECT * FROM users WHERE id = ?", userId)
@@ -183,7 +246,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	var prevData model.User
 
 	for rows.Next() {
-		if err := rows.Scan(&prevData.ID, &prevData.Name, &prevData.Age, &prevData.Address, &prevData.Password); err != nil {
+		if err := rows.Scan(&prevData.ID, &prevData.Name, &prevData.Age, &prevData.Address, &prevData.Email, &prevData.Password); err != nil {
 			log.Println(err.Error())
 		} else {
 			prevDatas = append(prevDatas, prevData)
@@ -200,11 +263,14 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		if user.Address == "" {
 			user.Address = prevDatas[0].Address
 		}
+		if user.Email == "" {
+			user.Email = prevDatas[0].Email
+		}
 		if user.Password == "" {
 			user.Password = prevDatas[0].Password
 		}
 
-		_, errQuery := db.Exec(`UPDATE users SET name = ?, age = ?, address = ?, password = ? WHERE id = ?;`, user.Name, user.Age, user.Address, user.Password, userId)
+		_, errQuery := db.Exec(`UPDATE users SET name = ?, age = ?, address = ?, email = ?, password = ? WHERE id = ?;`, user.Name, user.Age, user.Address, user.Email, user.Password, userId)
 
 		if errQuery == nil {
 			response.Status = 200
